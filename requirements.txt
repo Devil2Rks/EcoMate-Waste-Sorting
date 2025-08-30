@@ -1,0 +1,31 @@
+# Core ML/DL libraries for Colab T4 GPU
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+
+# Computer Vision and Image Processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+scikit-image>=0.21.0
+albumentations>=1.3.1
+
+# Geospatial and Satellite Data
+rasterio>=1.3.8
+earthengine-api>=0.1.0
+geopandas>=0.13.2
+
+# Data Science and Analysis
+pandas>=2.0.0
+scikit-learn>=1.3.0
+scipy>=1.11.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+tqdm>=4.65.0
+h5py>=3.9.0
+
+# Statistical Analysis
+statsmodels>=0.14.0
