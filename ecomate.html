@@ -119,6 +119,7 @@
             border-radius: 20px;
             max-width: 80%;
             word-wrap: break-word;
+            white-space: pre-wrap;
         }
 
         .user-message {
@@ -135,13 +136,22 @@
             border-bottom-left-radius: 5px;
         }
 
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
         .input-container {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .message-input {
             flex: 1;
+            min-width: 200px;
             padding: 15px 20px;
             border: 2px solid #e2e8f0;
             border-radius: 25px;
@@ -152,6 +162,26 @@
 
         .message-input:focus {
             border-color: #667eea;
+        }
+
+        .file-input-label {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+
+        .file-input-label:hover {
+            transform: scale(1.05);
+        }
+
+        .file-input {
+            display: none;
         }
 
         .send-btn {
@@ -199,6 +229,18 @@
             text-align: center;
         }
 
+        .selected-image-preview {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .selected-image-preview img {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -211,13 +253,17 @@
             .waste-types {
                 grid-template-columns: 1fr;
             }
+
+            .input-container {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>EcoMate</h1>
+            <h1>🌍 EcoMate</h1>
             <p>AI-Powered Waste Management Assistant</p>
         </div>
 
@@ -228,46 +274,46 @@
                 
                 <div class="waste-types">
                     <div class="waste-card" onclick="askAboutWaste('plastic')">
-                        <h3>Plastic Waste</h3>
+                        <h3>♻️ Plastic Waste</h3>
                         <p>Bottles, containers, packaging</p>
                     </div>
                     <div class="waste-card" onclick="askAboutWaste('organic')">
-                        <h3>Organic Waste</h3>
+                        <h3>🍃 Organic Waste</h3>
                         <p>Food scraps, garden waste</p>
                     </div>
                     <div class="waste-card" onclick="askAboutWaste('paper')">
-                        <h3>Paper Waste</h3>
+                        <h3>📄 Paper Waste</h3>
                         <p>Newspapers, cardboard, books</p>
                     </div>
                     <div class="waste-card" onclick="askAboutWaste('electronic')">
-                        <h3>E-Waste</h3>
+                        <h3>💻 E-Waste</h3>
                         <p>Electronics, batteries</p>
                     </div>
                     <div class="waste-card" onclick="askAboutWaste('glass')">
-                        <h3>Glass Waste</h3>
+                        <h3>🥤 Glass Waste</h3>
                         <p>Bottles, jars, containers</p>
                     </div>
                     <div class="waste-card" onclick="askAboutWaste('metal')">
-                        <h3>Metal Waste</h3>
+                        <h3>🔩 Metal Waste</h3>
                         <p>Cans, foil, scrap metal</p>
                     </div>
                 </div>
 
                 <div class="sdg-info">
-                    <h3>Supporting SDG 12</h3>
+                    <h3>🎯 Supporting SDG 12</h3>
                     <p>Responsible Consumption and Production</p>
                 </div>
             </div>
 
             <div class="chatbot-section">
                 <div class="chat-header">
-                    <h2>Ask EcoMate Assistant</h2>
+                    <h2>💬 Ask EcoMate Assistant</h2>
                     <p>Get personalized waste disposal advice</p>
                 </div>
                 
                 <div class="chat-container" id="chatContainer">
                     <div class="message bot-message">
-                        Hello! I'm EcoMate, your AI waste management assistant. Tell me about any waste item, and I'll help you dispose of it properly while supporting sustainable practices. What would you like to know about?
+                        Hello! I'm EcoMate, your AI waste management assistant. 🌱 Tell me about any waste item or upload an image, and I'll help you dispose of it properly while supporting sustainable practices. What would you like to know about?
                     </div>
                 </div>
                 
@@ -276,83 +322,223 @@
                         type="text" 
                         class="message-input" 
                         id="messageInput" 
-                        placeholder="Describe your waste item (e.g., 'plastic bottle', 'food scraps')..."
+                        placeholder="Describe your waste item or upload an image..."
                         onkeypress="handleKeyPress(event)"
+                    >
+                    <label for="imageInput" class="file-input-label">📷 Upload Image</label>
+                    <input 
+                        type="file" 
+                        id="imageInput" 
+                        class="file-input"
+                        accept="image/*"
+                        onchange="handleImageSelect(event)"
                     >
                     <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
                 </div>
+                <div id="imagePreviewContainer" class="selected-image-preview"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Configuration
-        const API_KEY = "Enter API KEY HERE";
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${API_KEY}`;
+        // Configuration - Gemini API
+        const API_KEY = "Your API key";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
+        
+        // Rate limiting
+        let lastRequestTime = 0;
+        const MIN_REQUEST_INTERVAL = 2000; // 2 seconds between requests
 
-        // Waste management knowledge base for context
-        const wasteContext = `
-        You are EcoMate, an AI waste management assistant. Your role is to help users properly dispose of waste items while promoting sustainable practices and supporting SDG 12 (Responsible Consumption and Production).
+        let selectedImage = null;
+        let selectedImageData = null;
 
-        When users ask about waste disposal, provide:
-        1. Specific disposal method (recycle, compost, landfill, special disposal)
-        2. Local considerations and tips
-        3. Environmental impact information
-        4. Ways to reduce or reuse when possible
-        5. Connection to SDG 12 principles
+        // Waste management knowledge base for context (SHORTENED to reduce tokens)
+        const wasteContext = 
+"You are EcoMate, an AI waste assistant. Always respond in exactly four sections. Keep answers short, clear, and practical. Avoid long paragraphs and avoid markdown formatting.\n\n" +
 
-        Common waste categories and disposal:
-        - Plastic: Most recyclable if clean, check local numbers (1-7)
-        - Organic: Compostable, reduces methane emissions
-        - Paper: Recyclable when clean and dry
-        - Glass: Infinitely recyclable, separate by color
-        - Metal: Highly recyclable, valuable resource recovery
-        - Electronics: Special e-waste recycling, contains valuable metals
-        - Hazardous: Paint, chemicals, batteries - special disposal required
+"SECTION FORMAT:\n" +
+"1. About the Item: 2–3 sentences explaining what the item is and why proper disposal matters.\n" +
+"2. What NOT to Do: 3–6 bullet points listing actions the user must avoid.\n" +
+"3. Proper Disposal (Step-by-step): 3–6 steps describing the correct disposal method.\n" +
+"4. Reduce or Reuse Options: 3–6 bullet points giving better alternatives or ways to reduce waste.\n\n" +
 
-        Always be helpful, educational, and promote environmental consciousness.
-        `;
+"RULES:\n" +
+"- Keep the entire reply under 12–15 sentences.\n" +
+"- Do not write introductions, summaries, greetings, or extra sections.\n" +
+"- No markdown, no asterisks, no emojis.\n" +
+"- Focus only on disposal, environmental impact, and practical steps.";
 
-        async function callGeminiAPI(message) {
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedImage = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImageData = e.target.result;
+                    const previewContainer = document.getElementById('imagePreviewContainer');
+                    previewContainer.innerHTML = `
+                        <p style="font-size: 0.9rem; color: #4a5568;">Selected image:</p>
+                        <img src="${selectedImageData}" alt="Selected waste" class="image-preview">
+                    `;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function getImageBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function callGeminiAPI(message, imageFile = null) {
             try {
+                let requestBody = {
+                    contents: [{
+                        parts: []
+                    }],
+                    generationConfig: {
+                        temperature: 0.7,
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 1500,
+                    }
+                };
+
+                // Add context and text
+                requestBody.contents[0].parts.push({
+                    text: wasteContext + "\n\nUser question: " + message
+                });
+
+                // Add image if provided
+                if (imageFile) {
+                    const base64Image = await getImageBase64(imageFile);
+                    requestBody.contents[0].parts.push({
+                        inline_data: {
+                            mime_type: imageFile.type,
+                            data: base64Image
+                        }
+                    });
+                }
+
+                console.log('Sending request to Gemini API...');
+                
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: wasteContext + "\n\nUser question: " + message
-                            }]
-                        }],
-                        generationConfig: {
-                            temperature: 0.7,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 500,
-                        }
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
-                const data = await response.json();
-                
-                if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-                    return data.candidates[0].content.parts[0].text;
-                } else {
-                    throw new Error('Invalid response format');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API Error Response:', errorData);
+                    throw new Error(`API Error: ${response.status} - ${JSON.stringify(errorData)}`);
                 }
+
+                const data = await response.json();
+                console.log('API Response:', data);
+                
+                // Fixed: Proper null checking for API response
+// --- UNIVERSAL GEMINI RESPONSE PARSER (FINAL & CLEAN) ---
+let responseText = null;
+
+// Case 1: Standard "candidates → content → parts → text"
+if (
+  data.candidates &&
+  data.candidates.length > 0 &&
+  data.candidates[0].content &&
+  data.candidates[0].content.parts &&
+  data.candidates[0].content.parts.length > 0 &&
+  data.candidates[0].content.parts[0].text
+) {
+  responseText = data.candidates[0].content.parts[0].text;
+}
+
+// Case 2: "candidates → content → output_text"
+if (!responseText &&
+    data.candidates?.[0]?.content?.output_text) {
+  responseText = data.candidates[0].content.output_text;
+}
+
+// Case 3: "candidates → text"
+if (!responseText &&
+    data.candidates?.[0]?.text) {
+  responseText = data.candidates[0].text;
+}
+
+// Case 4: "output_text" at root
+if (!responseText && data.output_text) {
+  responseText = data.output_text;
+}
+
+// Case 5: "text" at root
+if (!responseText && data.text) {
+  responseText = data.text;
+}
+
+// Fail if still unsupported
+if (!responseText) {
+  console.error("RAW API RESPONSE:", data);
+  throw new Error("Unsupported Gemini response format");
+}
+
+// Cleanup
+responseText = responseText
+  .replace(/\*\*/g, "")
+  .replace(/\*/g, "")
+  .replace(/\.([A-Z])/g, ". $1")
+  .trim();
+
+return responseText;
+
             } catch (error) {
-                console.error('API Error:', error);
-                return "I apologize, but I'm having trouble connecting to my knowledge base right now. For general waste disposal: Recycle clean plastics, metals, paper, and glass. Compost organic waste. Dispose of electronics at e-waste centers. Always check your local recycling guidelines for specific rules.";
+                console.error('Detailed API Error:', error);
+                return `I apologize, but I encountered an error: ${error.message}
+
+For general waste disposal guidance:
+
+Recycle: Clean plastics (check numbers 1-7), metals, paper, and glass
+
+Compost: Food scraps and organic waste to reduce methane emissions
+
+E-waste: Take electronics and batteries to special collection centers
+
+Hazardous: Paint, chemicals, and batteries need special disposal
+
+Always check your local recycling guidelines for specific rules in your area!`;
             }
         }
 
-        function addMessage(message, isUser = false) {
+        function addMessage(message, isUser = false, imageUrl = null) {
             const chatContainer = document.getElementById('chatContainer');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            messageDiv.textContent = message;
+            
+            if (imageUrl && isUser) {
+                const textSpan = document.createElement('span');
+                textSpan.textContent = message;
+                
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.alt = 'Uploaded waste';
+                img.className = 'image-preview';
+                
+                messageDiv.appendChild(img);
+                messageDiv.appendChild(document.createElement('br'));
+                messageDiv.appendChild(textSpan);
+            } else {
+                messageDiv.textContent = message;
+            }
+            
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -362,7 +548,7 @@
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'message bot-message';
             loadingDiv.id = 'loadingMessage';
-            loadingDiv.innerHTML = '<div class="loading"></div> Thinking...';
+            loadingDiv.innerHTML = '<div class="loading"></div> Analyzing and thinking...';
             chatContainer.appendChild(loadingDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -377,18 +563,36 @@
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const sendBtn = document.getElementById('sendBtn');
+            const imageInput = document.getElementById('imageInput');
             const message = input.value.trim();
             
-            if (!message) return;
+            if (!message && !selectedImage) {
+                alert('Please enter a message or upload an image!');
+                return;
+            }
             
-            // Disable input and button
+            // Rate limiting check
+            const now = Date.now();
+            const timeSinceLastRequest = now - lastRequestTime;
+            if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+                const waitTime = Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000);
+                alert(`Please wait ${waitTime} seconds before sending another message.`);
+                return;
+            }
+            lastRequestTime = now;
+            
+            // Disable inputs
             input.disabled = true;
             sendBtn.disabled = true;
+            imageInput.disabled = true;
             
             // Add user message
-            addMessage(message, true);
+            const userMessage = selectedImage ? 
+                (message || 'Please identify this waste item and tell me how to dispose of it.') : 
+                message;
+            addMessage(userMessage, true, selectedImageData);
             
-            // Clear input
+            // Clear inputs
             input.value = '';
             
             // Show loading
@@ -396,18 +600,26 @@
             
             try {
                 // Get AI response
-                const response = await callGeminiAPI(message);
+                const response = await callGeminiAPI(userMessage, selectedImage);
                 
                 // Hide loading and show response
                 hideLoading();
                 addMessage(response);
             } catch (error) {
                 hideLoading();
-                addMessage("I'm sorry, I encountered an error. Please try again.");
+                addMessage("I'm sorry, I encountered an error. Please try again. Make sure your API key is valid and has the necessary permissions.");
+                console.error('Send message error:', error);
             } finally {
-                // Re-enable input and button
+                // Clear selected image
+                selectedImage = null;
+                selectedImageData = null;
+                document.getElementById('imagePreviewContainer').innerHTML = '';
+                imageInput.value = '';
+                
+                // Re-enable inputs
                 input.disabled = false;
                 sendBtn.disabled = false;
+                imageInput.disabled = false;
                 input.focus();
             }
         }
@@ -427,8 +639,8 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('messageInput').focus();
+            console.log('EcoMate initialized successfully with Gemini API!');
         });
     </script>
 </body>
-
 </html>
